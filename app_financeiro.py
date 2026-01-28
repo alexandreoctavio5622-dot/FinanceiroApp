@@ -3,19 +3,27 @@ import pandas as pd
 from datetime import datetime
 import re
 import os
+from io import BytesIO
 
 # CONFIGURAÇÃO
 EXCEL_PATH = "Formulario.xlsx"
 SHEET_NAME = "Janeiro-26"
 
 st.title("Controle Financeiro Pessoal")
-st.write("Adicione lançamentos de Débito ou Crédito na planilha.")
+st.write("Adicione lançamentos e baixe a planilha atualizada no final.")
 
 def parse_valor(valor_str):
     if not valor_str: return 0.0
     valor_str = re.sub(r"[R$\s]", "", str(valor_str)).replace(",", ".")
     try: return float(valor_str)
     except: return 0.0
+
+# Inicializar o DataFrame na sessão para manter os dados enquanto o app estiver aberto
+if 'df_temp' not in st.session_state:
+    if os.path.exists(EXCEL_PATH):
+        st.session_state.df_temp = pd.read_excel(EXCEL_PATH, sheet_name=SHEET_NAME)
+    else:
+        st.error("Arquivo base não encontrado!")
 
 with st.form(key='form_lancamento'):
     data = st.date_input("Data", value=datetime.today())
@@ -28,33 +36,31 @@ with st.form(key='form_lancamento'):
     submit_button = st.form_submit_button(label='Adicionar Lançamento')
 
 if submit_button:
-    try:
-        if not os.path.exists(EXCEL_PATH):
-            st.error(f"Arquivo '{EXCEL_PATH}' não encontrado!")
-        else:
-            # Lendo a planilha com Pandas (mais tolerante a erros de XML)
-            df = pd.read_excel(EXCEL_PATH, sheet_name=SHEET_NAME)
-            
-            # Criando a nova linha
-            nova_linha = {
-                df.columns[0]: data.strftime("%d/%m/%Y"),
-                df.columns[1]: descricao,
-                df.columns[2]: nfp,
-                df.columns[3]: codigo,
-                df.columns[4]: forma_pagto,
-                df.columns[5]: parse_valor(debito),
-                df.columns[6]: parse_valor(credito)
-            }
-            
-            # Adicionando ao DataFrame
-            df = pd.concat([df, pd.DataFrame([nova_linha])], ignore_index=True)
-            
-            # Salvando de volta no Excel
-            with pd.ExcelWriter(EXCEL_PATH, engine='openpyxl', mode='w') as writer:
-                df.to_excel(writer, sheet_name=SHEET_NAME, index=False)
-            
-            st.success("Lançamento adicionado com sucesso!")
-            st.info("Nota: Os dados são salvos temporariamente no servidor do Streamlit.")
-            
-    except Exception as e:
-        st.error(f"Erro ao processar Excel: {e}")
+    nova_linha = {
+        st.session_state.df_temp.columns[0]: data.strftime("%d/%m/%Y"),
+        st.session_state.df_temp.columns[1]: descricao,
+        st.session_state.df_temp.columns[2]: nfp,
+        st.session_state.df_temp.columns[3]: codigo,
+        st.session_state.df_temp.columns[4]: forma_pagto,
+        st.session_state.df_temp.columns[5]: parse_valor(debito),
+        st.session_state.df_temp.columns[6]: parse_valor(credito)
+    }
+    st.session_state.df_temp = pd.concat([st.session_state.df_temp, pd.DataFrame([nova_linha])], ignore_index=True)
+    st.success("Lançamento adicionado à lista temporária!")
+
+# Mostrar os últimos lançamentos realizados nesta sessão
+st.write("### Lançamentos da Sessão")
+st.dataframe(st.session_state.df_temp.tail(5))
+
+# Botão de Download
+st.write("---")
+buffer = BytesIO()
+with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+    st.session_state.df_temp.to_excel(writer, sheet_name=SHEET_NAME, index=False)
+
+st.download_button(
+    label="📥 Baixar Planilha Atualizada",
+    data=buffer.getvalue(),
+    file_name=f"Financeiro_Atualizado_{datetime.now().strftime('%d-%m-%Y')}.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
