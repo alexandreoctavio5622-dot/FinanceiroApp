@@ -1,5 +1,5 @@
 import streamlit as st
-import openpyxl
+import pandas as pd
 from datetime import datetime
 import re
 import os
@@ -12,10 +12,10 @@ st.title("Controle Financeiro Pessoal")
 st.write("Adicione lançamentos de Débito ou Crédito na planilha.")
 
 def parse_valor(valor_str):
-    if not valor_str: return None
-    valor_str = re.sub(r"[R$\s]", "", valor_str).replace(",", ".")
+    if not valor_str: return 0.0
+    valor_str = re.sub(r"[R$\s]", "", str(valor_str)).replace(",", ".")
     try: return float(valor_str)
-    except: return None
+    except: return 0.0
 
 with st.form(key='form_lancamento'):
     data = st.date_input("Data", value=datetime.today())
@@ -32,20 +32,29 @@ if submit_button:
         if not os.path.exists(EXCEL_PATH):
             st.error(f"Arquivo '{EXCEL_PATH}' não encontrado!")
         else:
-            wb = openpyxl.load_workbook(EXCEL_PATH)
-            if SHEET_NAME not in wb.sheetnames:
-                st.error(f"Aba '{SHEET_NAME}' não encontrada!")
-            else:
-                sheet = wb[SHEET_NAME]
-                new_row = sheet.max_row + 1
-                sheet.cell(row=new_row, column=1).value = data.strftime("%d/%m/%Y")
-                sheet.cell(row=new_row, column=2).value = descricao
-                sheet.cell(row=new_row, column=3).value = nfp
-                sheet.cell(row=new_row, column=4).value = codigo
-                sheet.cell(row=new_row, column=5).value = forma_pagto
-                sheet.cell(row=new_row, column=6).value = parse_valor(debito)
-                sheet.cell(row=new_row, column=7).value = parse_valor(credito)
-                wb.save(EXCEL_PATH)
-                st.success(f"Lançamento adicionado com sucesso!")
+            # Lendo a planilha com Pandas (mais tolerante a erros de XML)
+            df = pd.read_excel(EXCEL_PATH, sheet_name=SHEET_NAME)
+            
+            # Criando a nova linha
+            nova_linha = {
+                df.columns[0]: data.strftime("%d/%m/%Y"),
+                df.columns[1]: descricao,
+                df.columns[2]: nfp,
+                df.columns[3]: codigo,
+                df.columns[4]: forma_pagto,
+                df.columns[5]: parse_valor(debito),
+                df.columns[6]: parse_valor(credito)
+            }
+            
+            # Adicionando ao DataFrame
+            df = pd.concat([df, pd.DataFrame([nova_linha])], ignore_index=True)
+            
+            # Salvando de volta no Excel
+            with pd.ExcelWriter(EXCEL_PATH, engine='openpyxl', mode='w') as writer:
+                df.to_excel(writer, sheet_name=SHEET_NAME, index=False)
+            
+            st.success("Lançamento adicionado com sucesso!")
+            st.info("Nota: Os dados são salvos temporariamente no servidor do Streamlit.")
+            
     except Exception as e:
-        st.error(f"Erro: {e}")
+        st.error(f"Erro ao processar Excel: {e}")
