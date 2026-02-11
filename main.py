@@ -1,11 +1,13 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from datetime import datetime
 import sqlite3
 
 app = FastAPI()
 
+# Libera acesso externo (necessário para navegador)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,10 +16,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Banco SQLite
 DATABASE = "financeiro.db"
 
-# Criar tabela se não existir
+# Criar tabela automaticamente
 def criar_tabela():
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
@@ -43,6 +44,14 @@ class Lancamento(BaseModel):
     valor: float
     tipo: str  # debito ou credito
 
+
+# Página principal (abre o index.html)
+@app.get("/")
+def home():
+    return FileResponse("index.html")
+
+
+# Adicionar lançamento
 @app.post("/lancamento/")
 def adicionar_lancamento(l: Lancamento):
 
@@ -62,15 +71,22 @@ def adicionar_lancamento(l: Lancamento):
     conn.commit()
     conn.close()
 
-    return {"mensagem": "Lançamento salvo no banco com sucesso"}
+    return {"mensagem": "Lançamento salvo com sucesso"}
 
+
+# Listar lançamentos
 @app.get("/lancamentos/")
 def listar_lancamentos():
 
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM lancamentos ORDER BY data")
+    cursor.execute("""
+        SELECT id, data, descricao, codigo, tipo, valor
+        FROM lancamentos
+        ORDER BY data DESC
+    """)
+
     dados = cursor.fetchall()
 
     conn.close()
