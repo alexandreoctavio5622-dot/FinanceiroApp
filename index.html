@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financeiro App</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f6f9;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+input, select, button {
+    width: 100%;
+    padding: 12px;
+    margin-top: 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+}
+
+button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    font-weight: bold;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+</style>
+</head>
+
+<body>
+
+<h1>💰 Meu Financeiro</h1>
+
+<div class="card">
+
+<input type="date" id="data">
+<input type="text" id="descricao" placeholder="Descrição">
+<input type="text" id="codigo" placeholder="Código">
+
+<select id="tipo">
+    <option value="debito">Débito</option>
+    <option value="credito">Crédito</option>
+</select>
+
+<input type="number" id="valor" placeholder="Valor" step="0.01">
+
+<button onclick="salvar()">Salvar</button>
+
+<p id="mensagem"></p>
+
+</div>
+
+<script>
+
+async function salvar() {
+
+    const dados = {
+        data: document.getElementById("data").value,
+        descricao: document.getElementById("descricao").value,
+        codigo: document.getElementById("codigo").value,
+        tipo: document.getElementById("tipo").value,
+        valor: parseFloat(document.getElementById("valor").value)
+    };
+
+    const resposta = await fetch("https://financeiroapp-ve1z.onrender.com/lancamento/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(dados)
+    });
+
+    const resultado = await resposta.json();
+
+    document.getElementById("mensagem").innerText = resultado.mensagem || resultado.erro;
+
+    document.getElementById("descricao").value = "";
+    document.getElementById("codigo").value = "";
+    document.getElementById("valor").value = "";
+}
+
+</script>
+
+</body>
+</html>
