@@ -1,13 +1,14 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 from datetime import datetime
 import sqlite3
+import os
 
 app = FastAPI()
 
-# Libera acesso externo (necessário para navegador)
+# Libera acesso externo
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -45,10 +46,12 @@ class Lancamento(BaseModel):
     tipo: str  # debito ou credito
 
 
-# Página principal (abre o index.html)
-@app.get("/")
+# Página principal (index.html)
+@app.get("/", response_class=HTMLResponse)
 def home():
-    return FileResponse("index.html")
+    caminho = os.path.join(os.path.dirname(__file__), "index.html")
+    with open(caminho, "r", encoding="utf-8") as f:
+        return f.read()
 
 
 # Adicionar lançamento
